@@ -1,0 +1,2179 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>👑 Admin Dashboard</h1>
+    <p class="admin-subtitle">Manage content, review feedback, and monitor system performance</p>
+</div>
+
+<!-- Statistics Overview -->
+<div class="admin-stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value">{{ user_count }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+            <div class="stat-label">Quizzes Generated</div>
+            <div class="stat-value">{{ quiz_count }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">💬</div>
+        <div class="stat-content">
+            <div class="stat-label">Pending Feedback</div>
+            <div class="stat-value">{{ feedback_items|length }}</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">🚩</div>
+        <div class="stat-content">
+            <div class="stat-label">Flagged Questions</div>
+            <div class="stat-value">{{ flagged_count }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Navigation Tabs -->
+<div class="admin-tabs">
+    <button class="tab-btn active" onclick="showTab('feedback')">📝 Question Feedback</button>
+    <button class="tab-btn" onclick="showTab('content')">📚 Content Management</button>
+    <button class="tab-btn" onclick="showTab('users')">👥 User Management</button>
+    <button class="tab-btn" onclick="showTab('analytics')">📈 Analytics</button>
+</div>
+
+<!-- Feedback Tab -->
+<div id="feedback-tab" class="tab-content active">
+    <div class="card">
+        <div class="card-header">
+            <div class="header-content">
+            <h2>🚩 Question Feedback & Flagged Content</h2>
+                <div class="feedback-stats">
+                    <span class="stat-badge" id="feedback-count">{{ feedback_items|length }} Pending</span>
+                    <span class="stat-badge flagged-count" id="flagged-count">{{ flagged_count }} Flagged</span>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="refreshFeedback()" id="refresh-btn">
+                    <span class="btn-text">🔄 Refresh</span>
+                    <span class="btn-loading" style="display: none;">⏳ Loading...</span>
+                </button>
+                <button class="btn btn-success" onclick="markAllResolved()">✅ Mark All Resolved</button>
+                <button class="btn btn-outline" onclick="toggleFilter()">🔍 Filter</button>
+                <button class="btn btn-outline" onclick="filterFlagged()">🚩 Flagged Only</button>
+                <button class="btn btn-warning" onclick="debugFeedback()">🐛 Debug</button>
+                <button class="btn btn-info" onclick="createTestFlagged()">🧪 Test Data</button>
+            </div>
+        </div>
+        
+        <!-- Filter Section -->
+        <div class="filter-section" id="filter-section" style="display: none;">
+            <div class="filter-controls">
+                <div class="filter-group">
+                    <label for="status-filter">Status:</label>
+                    <select id="status-filter">
+                        <option value="all">All Feedback</option>
+                        <option value="flagged">Flagged Only</option>
+                        <option value="normal">Normal Only</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="date-filter">Date Range:</label>
+                    <select id="date-filter">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-sm btn-outline" onclick="clearFilters()">Clear</button>
+            </div>
+        </div>
+        
+        <div class="feedback-container" id="feedback-container">
+        {% if feedback_items %}
+                <div class="feedback-list" id="feedback-list">
+                {% for item in feedback_items %}
+                    <div class="feedback-item {% if item.is_flagged %}flagged{% endif %}" data-id="{{ item.id }}" data-flagged="{{ item.is_flagged|lower }}" data-date="{{ item.created_at.strftime('%Y-%m-%d') }}">
+                        {% if item.is_flagged %}
+                        <div class="flagged-alert">
+                            <span class="alert-icon">⚠️</span>
+                            <span class="alert-text">FLAGGED CONTENT - REQUIRES IMMEDIATE ATTENTION</span>
+                        </div>
+                        {% endif %}
+                        <div class="feedback-header">
+                        <div class="feedback-meta">
+                                <div class="user-section">
+                                    <span class="user-avatar">👤</span>
+                                    <div class="user-details">
+                                        <span class="user-info">User #{{ item.user_id }}</span>
+                                        <span class="date-info">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                                    </div>
+                                </div>
+                                <div class="status-section">
+                            {% if item.is_flagged %}
+                                        <span class="flagged-badge">
+                                            <span class="flag-icon">🚩</span>
+                                            <span class="flag-text">FLAGGED</span>
+                                        </span>
+                                    {% else %}
+                                        <span class="normal-badge">
+                                            <span class="normal-icon">💬</span>
+                                            <span class="normal-text">NORMAL</span>
+                                        </span>
+                            {% endif %}
+                                </div>
+                        </div>
+                        <div class="feedback-actions">
+                                <button class="btn btn-sm btn-success" onclick="resolveFeedback({{ item.id }})" title="Mark as Resolved">
+                                    <span class="btn-icon">✅</span>
+                                    <span class="btn-text">Resolve</span>
+                                </button>
+                                <button class="btn btn-sm btn-info" onclick="viewDetails({{ item.id }})" title="View Full Details">
+                                    <span class="btn-icon">👁️</span>
+                                    <span class="btn-text">Details</span>
+                                </button>
+                                {% if item.is_flagged %}
+                                <button class="btn btn-sm btn-warning" onclick="unflagFeedback({{ item.id }})" title="Remove Flag">
+                                    <span class="btn-icon">🔓</span>
+                                    <span class="btn-text">Unflag</span>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-danger" onclick="flagFeedback({{ item.id }})" title="Flag as Inappropriate">
+                                    <span class="btn-icon">🚩</span>
+                                    <span class="btn-text">Flag</span>
+                                </button>
+                                {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="feedback-content">
+                        <div class="question-section">
+                                <div class="section-header">
+                                    <h4>📝 Question</h4>
+                                    <span class="section-indicator"></span>
+                                </div>
+                            <div class="question-text">{{ item.question_text }}</div>
+                        </div>
+                        
+                        <div class="feedback-section">
+                                <div class="section-header">
+                                    <h4>💬 Feedback</h4>
+                                    <span class="section-indicator"></span>
+                                </div>
+                            <div class="feedback-text">{{ item.feedback_text }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">🎉</div>
+                <h3>No Pending Feedback</h3>
+                <p>Great job! All feedback has been reviewed.</p>
+                    <div class="empty-actions">
+                        <button class="btn btn-outline" onclick="refreshFeedback()">🔄 Refresh</button>
+                    </div>
+            </div>
+        {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Content Management Tab -->
+<div id="content-tab" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h2>📚 Content Management</h2>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="uploadContent()">📤 Upload Content</button>
+                <button class="btn btn-secondary" onclick="manageMaterials()">📋 Manage Materials</button>
+            </div>
+        </div>
+        
+        <div class="content-stats">
+            <div class="content-stat">
+                <h4>📄 Total Materials</h4>
+                <span class="stat-number">{{ material_count }}</span>
+            </div>
+            <div class="content-stat">
+                <h4>📊 Total Questions</h4>
+                <span class="stat-number">{{ question_count }}</span>
+            </div>
+        </div>
+        
+        <div class="recent-materials">
+            <h3>📋 Recent Materials</h3>
+            <div class="materials-list">
+                {% for material in recent_materials %}
+                <div class="material-item">
+                    <div class="material-info">
+                        <h4>{{ material.title }}</h4>
+                        <p>{{ material.content[:100] }}...</p>
+                        <small>Type: {{ material.material_type }} | Uploaded: {{ material.created_at.strftime('%Y-%m-%d') }}</small>
+                    </div>
+                    <div class="material-actions">
+                        <button class="btn btn-sm btn-info" onclick="viewMaterial({{ material.id }})">👁️ View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editMaterial({{ material.id }})">✏️ Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteMaterial({{ material.id }})">🗑️ Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Management Tab -->
+<div id="users-tab" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h2>👥 User Management</h2>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="exportUsers()">📊 Export Users</button>
+                <button class="btn btn-secondary" onclick="viewUserStats()">📈 User Stats</button>
+            </div>
+        </div>
+        
+        <div class="user-stats">
+            <div class="user-stat">
+                <h4>👤 Active Users</h4>
+                <span class="stat-number">{{ active_users }}</span>
+            </div>
+            <div class="user-stat">
+                <h4>📊 Total Quizzes</h4>
+                <span class="stat-number">{{ total_quizzes }}</span>
+            </div>
+            <div class="user-stat">
+                <h4>⭐ Average Score</h4>
+                <span class="stat-number">{{ avg_score }}%</span>
+            </div>
+        </div>
+        
+        <div class="recent-users">
+            <h3>👥 Recent Users</h3>
+            <div class="users-list">
+                {% for user in recent_users %}
+                <div class="user-item">
+                    <div class="user-info">
+                        <h4>{{ user.username }}</h4>
+                        <p>{{ user.email }}</p>
+                        <small>Joined: {{ user.created_at.strftime('%Y-%m-%d') }}</small>
+                    </div>
+                    <div class="user-actions">
+                        <button class="btn btn-sm btn-info" onclick="viewUser({{ user.id }})">👁️ View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editUser({{ user.id }})">✏️ Edit</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analytics Tab -->
+<div id="analytics-tab" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h2>📈 System Analytics</h2>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="exportAnalytics()">📊 Export Data</button>
+                <button class="btn btn-secondary" onclick="refreshAnalytics()">🔄 Refresh</button>
+            </div>
+        </div>
+        
+        <div class="analytics-grid">
+            <div class="analytics-chart">
+                <h3>📊 Quiz Performance Over Time</h3>
+                <canvas id="quiz-performance-chart"></canvas>
+            </div>
+            <div class="analytics-chart">
+                <h3>👥 User Growth</h3>
+                <canvas id="user-growth-chart"></canvas>
+            </div>
+        </div>
+        
+        <div class="analytics-summary">
+            <h3>📋 Quick Stats</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Most Popular Subject:</span>
+                    <span class="stat-value">{{ popular_subject }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Average Quiz Duration:</span>
+                    <span class="stat-value">{{ avg_duration }} min</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">System Uptime:</span>
+                    <span class="stat-value">{{ uptime }}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feedback Details Modal -->
+<div id="feedback-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📝 Feedback Details</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="feedback-details">
+            <!-- Dynamic content will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-success" onclick="resolveFromModal()">✅ Resolve</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Material View Modal -->
+<div id="material-view-modal" class="modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h3>📄 View Material</h3>
+            <span class="close" onclick="closeMaterialModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="material-view-content">
+            <!-- Dynamic content will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeMaterialModal()">❌ Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Material Edit Modal -->
+<div id="material-edit-modal" class="modal">
+    <div class="modal-content large-modal edit-modal">
+        <div class="modal-header">
+            <div class="header-content">
+                <h3>✏️ Edit Material</h3>
+                <div class="material-status">
+                    <span class="status-badge" id="edit-status-badge">Ready</span>
+                </div>
+            </div>
+            <span class="close" onclick="closeMaterialEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="material-edit-form" class="edit-form">
+                <!-- Material Info Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>📄 Material Information</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-material-title">
+                                <span class="label-icon">📝</span>
+                                Material Title
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text" id="edit-material-title" name="title" required 
+                                   placeholder="Enter a descriptive title for your material"
+                                   maxlength="200">
+                            <div class="input-footer">
+                                <span class="char-count" id="title-char-count">0/200</span>
+                                <span class="input-hint">Keep it concise and descriptive</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-material-type">
+                                <span class="label-icon">🏷️</span>
+                                Material Type
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <select id="edit-material-type" name="material_type" required>
+                                <option value="text">📄 Text Document</option>
+                                <option value="pdf">📋 PDF Document</option>
+                                <option value="url">🔗 Web URL</option>
+                            </select>
+                            <div class="input-footer">
+                                <span class="input-hint">Select the type of content this material represents</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>📝 Content</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-material-content">
+                                <span class="label-icon">📖</span>
+                                Material Content
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <div class="textarea-container">
+                                <textarea id="edit-material-content" name="content" required 
+                                          placeholder="Enter the main content of your material..."
+                                          rows="12"></textarea>
+                                <div class="textarea-tools">
+                                    <button type="button" class="tool-btn" onclick="formatText('bold')" title="Bold">
+                                        <strong>B</strong>
+                                    </button>
+                                    <button type="button" class="tool-btn" onclick="formatText('italic')" title="Italic">
+                                        <em>I</em>
+                                    </button>
+                                    <button type="button" class="tool-btn" onclick="insertLineBreak()" title="Line Break">
+                                        ↵
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="input-footer">
+                                <span class="char-count" id="content-char-count">0 characters</span>
+                                <span class="input-hint">Use formatting tools above for better presentation</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>👁️ Preview</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="preview-container">
+                        <div class="preview-content" id="content-preview">
+                            <p class="preview-placeholder">Content preview will appear here...</p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="footer-left">
+                <button type="button" class="btn btn-outline" onclick="previewMaterial()">
+                    👁️ Preview
+                </button>
+                <button type="button" class="btn btn-outline" onclick="resetForm()">
+                    🔄 Reset
+                </button>
+            </div>
+            <div class="footer-right">
+                <button class="btn btn-secondary" onclick="closeMaterialEditModal()">
+                    ❌ Cancel
+                </button>
+                <button class="btn btn-primary" onclick="saveMaterialEdit()" id="save-btn">
+                    💾 Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Material Delete Confirmation Modal -->
+<div id="material-delete-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🗑️ Delete Material</h3>
+            <span class="close" onclick="closeMaterialDeleteModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this material?</p>
+            <div id="material-delete-info">
+                <!-- Material info will be loaded here -->
+            </div>
+            <p class="warning-text">⚠️ This action cannot be undone!</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="confirmMaterialDelete()">🗑️ Delete</button>
+            <button class="btn btn-secondary" onclick="closeMaterialDeleteModal()">❌ Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- User View Modal -->
+<div id="user-view-modal" class="modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <div class="header-content">
+                <h3>👤 User Details</h3>
+                <div class="user-status">
+                    <span class="status-badge" id="user-status-badge">Active</span>
+                </div>
+            </div>
+            <span class="close" onclick="closeUserModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="user-view-content">
+            <!-- Dynamic content will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeUserModal()">❌ Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- User Edit Modal -->
+<div id="user-edit-modal" class="modal">
+    <div class="modal-content large-modal edit-modal">
+        <div class="modal-header">
+            <div class="header-content">
+                <h3>✏️ Edit User</h3>
+                <div class="user-status">
+                    <span class="status-badge" id="user-edit-status-badge">Ready</span>
+                </div>
+            </div>
+            <span class="close" onclick="closeUserEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="user-edit-form" class="edit-form">
+                <!-- User Information Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>👤 User Information</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-user-username">
+                                <span class="label-icon">👤</span>
+                                Username
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text" id="edit-user-username" name="username" required 
+                                   placeholder="Enter username" maxlength="80">
+                            <div class="input-footer">
+                                <span class="char-count" id="username-char-count">0/80</span>
+                                <span class="input-hint">Unique identifier for the user</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-user-email">
+                                <span class="label-icon">📧</span>
+                                Email Address
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="email" id="edit-user-email" name="email" required 
+                                   placeholder="Enter email address" maxlength="120">
+                            <div class="input-footer">
+                                <span class="char-count" id="email-char-count">0/120</span>
+                                <span class="input-hint">User's email for login and notifications</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-user-admin">
+                                <span class="label-icon">👑</span>
+                                Admin Privileges
+                            </label>
+                            <select id="edit-user-admin" name="is_admin">
+                                <option value="false">👤 Regular User</option>
+                                <option value="true">👑 Administrator</option>
+                            </select>
+                            <div class="input-footer">
+                                <span class="input-hint">Grant or revoke admin privileges</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>🔐 Password</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-user-password">
+                                <span class="label-icon">🔑</span>
+                                New Password
+                            </label>
+                            <input type="password" id="edit-user-password" name="password" 
+                                   placeholder="Leave blank to keep current password" minlength="6">
+                            <div class="input-footer">
+                                <span class="input-hint">Minimum 6 characters. Leave blank to keep current password.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Statistics Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>📊 User Statistics</h4>
+                        <div class="section-indicator"></div>
+                    </div>
+                    <div class="user-stats-preview" id="user-stats-preview">
+                        <!-- User statistics will be loaded here -->
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div class="footer-left">
+                <button type="button" class="btn btn-outline" onclick="refreshUserStats()">
+                    🔄 Refresh Stats
+                </button>
+            </div>
+            <div class="footer-right">
+                <button class="btn btn-secondary" onclick="closeUserEditModal()">
+                    ❌ Cancel
+                </button>
+                <button class="btn btn-primary" onclick="saveUserEdit()" id="save-user-btn">
+                    💾 Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Stats Modal -->
+<div id="user-stats-modal" class="modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h3>📈 User Statistics</h3>
+            <span class="close" onclick="closeUserStatsModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="stats-container" id="user-stats-content">
+                <!-- Statistics will be loaded here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="exportUserStats()">📊 Export Stats</button>
+            <button class="btn btn-secondary" onclick="closeUserStatsModal()">❌ Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Tab Management
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.classList.add('active');
+}
+
+// Feedback Management
+function resolveFeedback(feedbackId) {
+    if (confirm('Are you sure you want to resolve this feedback?')) {
+        fetch(`/admin/resolve-feedback/${feedbackId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error resolving feedback: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while resolving feedback.');
+        });
+    }
+}
+
+function markAllResolved() {
+    if (confirm('Are you sure you want to mark ALL feedback as resolved?')) {
+        fetch('/admin/resolve-all-feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+        });
+    }
+}
+
+function refreshFeedback() {
+    const refreshBtn = document.getElementById('refresh-btn');
+    const btnText = refreshBtn.querySelector('.btn-text');
+    const btnLoading = refreshBtn.querySelector('.btn-loading');
+    
+    // Show loading state
+    btnText.style.display = 'none';
+    btnLoading.style.display = 'inline';
+    refreshBtn.disabled = true;
+    
+    // Fetch fresh feedback data
+    fetch('/admin/feedback-list')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateFeedbackList(data.feedback_items);
+                updateFeedbackStats(data.feedback_items);
+                btnText.style.display = 'inline';
+                btnLoading.style.display = 'none';
+                refreshBtn.disabled = false;
+                
+                // Show success message
+                showNotification('Feedback refreshed successfully!', 'success');
+            } else {
+                throw new Error(data.message || 'Failed to refresh feedback');
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing feedback:', error);
+            btnText.style.display = 'inline';
+            btnLoading.style.display = 'none';
+            refreshBtn.disabled = false;
+            showNotification('Error refreshing feedback: ' + error.message, 'error');
+        });
+}
+
+function viewDetails(feedbackId) {
+    // Load feedback details into modal
+    fetch(`/admin/feedback-details/${feedbackId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('feedback-details').innerHTML = `
+                <div class="feedback-detail">
+                    <h4>Question:</h4>
+                    <p>${data.question_text}</p>
+                    <h4>Feedback:</h4>
+                    <p>${data.feedback_text}</p>
+                    <h4>User Info:</h4>
+                    <p>User ID: ${data.user_id}</p>
+                    <p>Date: ${data.created_at}</p>
+                    <p>Flagged: ${data.is_flagged ? 'Yes' : 'No'}</p>
+                </div>
+            `;
+            document.getElementById('feedback-modal').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading feedback details.');
+        });
+}
+
+// Modal Management
+function closeModal() {
+    document.getElementById('feedback-modal').style.display = 'none';
+}
+
+function resolveFromModal() {
+    const feedbackId = document.querySelector('.feedback-detail').dataset.feedbackId;
+    resolveFeedback(feedbackId);
+    closeModal();
+}
+
+// Enhanced Feedback Functions
+function updateFeedbackList(feedbackItems) {
+    const feedbackList = document.getElementById('feedback-list');
+    const feedbackContainer = document.getElementById('feedback-container');
+    
+    if (!feedbackItems || feedbackItems.length === 0) {
+        feedbackContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🎉</div>
+                <h3>No Pending Feedback</h3>
+                <p>Great job! All feedback has been reviewed.</p>
+                <div class="empty-actions">
+                    <button class="btn btn-outline" onclick="refreshFeedback()">🔄 Refresh</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Ensure list container exists
+    let listEl = feedbackList;
+    if (!listEl) {
+        feedbackContainer.innerHTML = '<div class="feedback-list" id="feedback-list"></div>';
+        listEl = document.getElementById('feedback-list');
+    }
+
+    listEl.innerHTML = feedbackItems.map(item => `
+        <div class="feedback-item ${item.is_flagged ? 'flagged' : ''}" data-id="${item.id}" data-flagged="${item.is_flagged}" data-date="${item.created_at}">
+            ${item.is_flagged ? '<div class="flagged-alert" style="display:flex;align-items:center;gap:8px;background:#fff0f0;border:1px solid #f1b0b7;color:#842029;padding:8px 12px;border-radius:6px;margin-bottom:8px;"><span class="alert-icon">⚠️</span><span class="alert-text" style="font-weight:600;letter-spacing:0.2px;">FLAGGED CONTENT - REQUIRES IMMEDIATE ATTENTION</span></div>' : ''}
+            <div class="feedback-header">
+                <div class="feedback-meta">
+                    <div class="user-section">
+                        <span class="user-avatar">👤</span>
+                        <div class="user-details">
+                            <span class="user-info">User #${item.user_id}</span>
+                            <span class="date-info">${item.created_at}</span>
+                        </div>
+                    </div>
+                    <div class="status-section">
+                        ${item.is_flagged ? 
+                            `<span class="flagged-badge">
+                                <span class="flag-icon">🚩</span>
+                                <span class="flag-text">FLAGGED</span>
+                            </span>` :
+                            `<span class="normal-badge">
+                                <span class="normal-icon">💬</span>
+                                <span class="normal-text">NORMAL</span>
+                            </span>`
+                        }
+                    </div>
+                </div>
+                <div class="feedback-actions">
+                    <button class="btn btn-sm btn-success" onclick="resolveFeedback(${item.id})" title="Mark as Resolved">
+                        <span class="btn-icon">✅</span>
+                        <span class="btn-text">Resolve</span>
+                    </button>
+                    <button class="btn btn-sm btn-info" onclick="viewDetails(${item.id})" title="View Full Details">
+                        <span class="btn-icon">👁️</span>
+                        <span class="btn-text">Details</span>
+                    </button>
+                    ${item.is_flagged ? 
+                        `<button class="btn btn-sm btn-warning" onclick="unflagFeedback(${item.id})" title="Remove Flag">
+                            <span class="btn-icon">🔓</span>
+                            <span class="btn-text">Unflag</span>
+                        </button>` :
+                        `<button class="btn btn-sm btn-danger" onclick="flagFeedback(${item.id})" title="Flag as Inappropriate">
+                            <span class="btn-icon">🚩</span>
+                            <span class="btn-text">Flag</span>
+                        </button>`
+                    }
+                </div>
+            </div>
+            
+            <div class="feedback-content">
+                <div class="question-section">
+                    <div class="section-header">
+                        <h4>📝 Question</h4>
+                        <span class="section-indicator"></span>
+                    </div>
+                    <div class="question-text">${item.question_text}</div>
+                </div>
+                
+                <div class="feedback-section">
+                    <div class="section-header">
+                        <h4>💬 Feedback</h4>
+                        <span class="section-indicator"></span>
+                    </div>
+                    <div class="feedback-text">${item.feedback_text}</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateFeedbackStats(feedbackItems) {
+    const totalCount = feedbackItems.length;
+    const flaggedCount = feedbackItems.filter(item => item.is_flagged).length;
+    
+    document.getElementById('feedback-count').textContent = `${totalCount} Pending`;
+    document.getElementById('flagged-count').textContent = `${flaggedCount} Flagged`;
+}
+
+function filterFlagged() {
+    const statusSelect = document.getElementById('status-filter');
+    if (statusSelect) {
+        statusSelect.value = 'flagged';
+        applyFilters();
+        showNotification('Showing flagged feedback only', 'info');
+    }
+}
+
+function toggleFilter() {
+    const filterSection = document.getElementById('filter-section');
+    const isVisible = filterSection.style.display !== 'none';
+    filterSection.style.display = isVisible ? 'none' : 'block';
+}
+
+function applyFilters() {
+    const statusFilter = document.getElementById('status-filter').value;
+    const dateFilter = document.getElementById('date-filter').value;
+    const feedbackItems = document.querySelectorAll('.feedback-item');
+    
+    feedbackItems.forEach(item => {
+        let showItem = true;
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            const isFlagged = item.dataset.flagged === 'true';
+            if (statusFilter === 'flagged' && !isFlagged) showItem = false;
+            if (statusFilter === 'normal' && isFlagged) showItem = false;
+        }
+        
+        // Apply date filter
+        if (dateFilter !== 'all' && showItem) {
+            const itemDate = new Date(item.dataset.date);
+            const now = new Date();
+            
+            switch (dateFilter) {
+                case 'today':
+                    showItem = itemDate.toDateString() === now.toDateString();
+                    break;
+                case 'week':
+                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    showItem = itemDate >= weekAgo;
+                    break;
+                case 'month':
+                    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    showItem = itemDate >= monthAgo;
+                    break;
+            }
+        }
+        
+        item.style.display = showItem ? 'block' : 'none';
+    });
+    
+    showNotification('Filters applied successfully!', 'success');
+}
+
+function clearFilters() {
+    document.getElementById('status-filter').value = 'all';
+    document.getElementById('date-filter').value = 'all';
+    
+    const feedbackItems = document.querySelectorAll('.feedback-item');
+    feedbackItems.forEach(item => {
+        item.style.display = 'block';
+    });
+    
+    showNotification('Filters cleared!', 'info');
+}
+
+function flagFeedback(feedbackId) {
+    if (confirm('Are you sure you want to flag this feedback as inappropriate?')) {
+        fetch(`/admin/flag-feedback/${feedbackId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Feedback flagged successfully!', 'success');
+                refreshFeedback();
+            } else {
+                showNotification('Error flagging feedback: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred while flagging feedback.', 'error');
+        });
+    }
+}
+
+function unflagFeedback(feedbackId) {
+    if (confirm('Are you sure you want to remove the flag from this feedback?')) {
+        fetch(`/admin/unflag-feedback/${feedbackId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Flag removed successfully!', 'success');
+                refreshFeedback();
+            } else {
+                showNotification('Error removing flag: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred while removing flag.', 'error');
+        });
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+function debugFeedback() {
+    fetch('/admin/debug-feedback')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const debugInfo = data.debug_info;
+                const debugMessage = `
+                    Debug Information:
+                    • Total Feedback: ${debugInfo.total_feedback}
+                    • Flagged Feedback: ${debugInfo.flagged_feedback}
+                    • Unresolved Feedback: ${debugInfo.unresolved_feedback}
+                    
+                    Flagged Items:
+                    ${debugInfo.flagged_items.map(item => 
+                        `• ID: ${item.id}, User: ${item.user_id}, Flagged: ${item.is_flagged}, Resolved: ${item.is_resolved}`
+                    ).join('\n')}
+                `;
+                
+                alert(debugMessage);
+                console.log('Debug Info:', debugInfo);
+            } else {
+                showNotification('Error getting debug info: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred while getting debug info.', 'error');
+        });
+}
+
+function createTestFlagged() {
+    if (confirm('This will create test flagged feedback items. Continue?')) {
+        fetch('/admin/create-test-flagged-feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Test flagged feedback created successfully!', 'success');
+                refreshFeedback();
+            } else {
+                showNotification('Error creating test feedback: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred while creating test feedback.', 'error');
+        });
+    }
+}
+
+// Content Management Functions
+function uploadContent() {
+    window.location.href = '/upload-material';
+}
+
+function manageMaterials() {
+    window.location.href = '/list-materials';
+}
+
+// Material Management Functions
+let currentMaterialId = null;
+
+function viewMaterial(materialId) {
+    currentMaterialId = materialId;
+    fetch(`/admin/material-details/${materialId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('material-view-content').innerHTML = `
+                    <div class="material-view" style="display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#eef2ff;border:1px solid #dbe4ff;font-size:20px;">📄</div>
+                            <div>
+                                <h4 style="margin:0;font-size:18px;">${data.material.title}</h4>
+                                <div style="font-size:12px;color:#6b7280;">ID: ${data.material.id}</div>
+                            </div>
+                        </div>
+                        <div class="material-meta" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                            <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                                <div style="font-size:12px;color:#6b7280;">Type</div>
+                                <div style="font-weight:600;">${data.material.material_type.toUpperCase()}</div>
+                            </div>
+                            <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                                <div style="font-size:12px;color:#6b7280;">Created</div>
+                                <div style="font-weight:600;">${data.material.created_at}</div>
+                            </div>
+                            <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                                <div style="font-size:12px;color:#6b7280;">User</div>
+                                <div style="font-weight:600;">#${data.material.user_id}</div>
+                            </div>
+                        </div>
+                        <div class="material-content" style="margin-top:6px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <h5 style="margin:0;">Content Preview</h5>
+                                <span style="font-size:12px;color:#64748b;">${data.material.content.length} chars</span>
+                            </div>
+                            <div class="content-preview" style="white-space:pre-wrap;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;max-height:360px;overflow:auto;">${data.material.content.substring(0, 1000)}${data.material.content.length > 1000 ? '...' : ''}</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('material-view-modal').style.display = 'block';
+            } else {
+                alert('Error loading material: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading the material.');
+        });
+}
+
+function editMaterial(materialId) {
+    currentMaterialId = materialId;
+    fetch(`/admin/material-details/${materialId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('edit-material-title').value = data.material.title;
+                document.getElementById('edit-material-content').value = data.material.content;
+                document.getElementById('edit-material-type').value = data.material.material_type;
+                
+                // Initialize character counters
+                updateCharCounters();
+                
+                // Update preview
+                updatePreview();
+                
+                // Update status
+                updateEditStatus('ready');
+                
+                document.getElementById('material-edit-modal').style.display = 'block';
+            } else {
+                alert('Error loading material: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading the material.');
+        });
+}
+
+function deleteMaterial(materialId) {
+    currentMaterialId = materialId;
+    fetch(`/admin/material-details/${materialId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('material-delete-info').innerHTML = `
+                    <div class="material-info">
+                        <h4>📄 ${data.material.title}</h4>
+                        <p><strong>Type:</strong> ${data.material.material_type.toUpperCase()}</p>
+                        <p><strong>Created:</strong> ${data.material.created_at}</p>
+                        <p><strong>Content Length:</strong> ${data.material.content.length} characters</p>
+                    </div>
+                `;
+                document.getElementById('material-delete-modal').style.display = 'block';
+            } else {
+                alert('Error loading material: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading the material.');
+        });
+}
+
+// Modal Management Functions
+function closeMaterialModal() {
+    document.getElementById('material-view-modal').style.display = 'none';
+    currentMaterialId = null;
+}
+
+function closeMaterialEditModal() {
+    document.getElementById('material-edit-modal').style.display = 'none';
+    currentMaterialId = null;
+}
+
+function closeMaterialDeleteModal() {
+    document.getElementById('material-delete-modal').style.display = 'none';
+    currentMaterialId = null;
+}
+
+function saveMaterialEdit() {
+    if (!currentMaterialId) {
+        alert('No material selected for editing.');
+        return;
+    }
+
+    const formData = {
+        title: document.getElementById('edit-material-title').value,
+        content: document.getElementById('edit-material-content').value,
+        material_type: document.getElementById('edit-material-type').value
+    };
+
+    if (!formData.title.trim() || !formData.content.trim()) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Update status to saving
+    updateEditStatus('saving');
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '💾 Saving...';
+
+    fetch(`/admin/update-material/${currentMaterialId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateEditStatus('saved');
+            setTimeout(() => {
+                alert('Material updated successfully!');
+                closeMaterialEditModal();
+                location.reload();
+            }, 1000);
+        } else {
+            updateEditStatus('error');
+            alert('Error updating material: ' + data.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '💾 Save Changes';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateEditStatus('error');
+        alert('An error occurred while updating the material.');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '💾 Save Changes';
+    });
+}
+
+function confirmMaterialDelete() {
+    if (!currentMaterialId) {
+        alert('No material selected for deletion.');
+        return;
+    }
+
+    fetch(`/admin/delete-material/${currentMaterialId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+            alert('Material deleted successfully!');
+            closeMaterialDeleteModal();
+                location.reload();
+            } else {
+                alert('Error deleting material: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the material.');
+        });
+    }
+
+// Enhanced Edit Modal Functions
+function updateCharCounters() {
+    const titleInput = document.getElementById('edit-material-title');
+    const contentTextarea = document.getElementById('edit-material-content');
+    const titleCount = document.getElementById('title-char-count');
+    const contentCount = document.getElementById('content-char-count');
+    
+    if (titleInput && titleCount) {
+        const titleLength = titleInput.value.length;
+        titleCount.textContent = `${titleLength}/200`;
+        titleCount.className = titleLength > 180 ? 'char-count warning' : 'char-count';
+    }
+    
+    if (contentTextarea && contentCount) {
+        const contentLength = contentTextarea.value.length;
+        contentCount.textContent = `${contentLength} characters`;
+        contentCount.className = contentLength > 5000 ? 'char-count warning' : 'char-count';
+    }
+}
+
+function updatePreview() {
+    const title = document.getElementById('edit-material-title').value;
+    const content = document.getElementById('edit-material-content').value;
+    const type = document.getElementById('edit-material-type').value;
+    const preview = document.getElementById('content-preview');
+    
+    if (title || content) {
+        preview.innerHTML = `
+            <div class="preview-material">
+                <h3 class="preview-title">${title || 'Untitled Material'}</h3>
+                <div class="preview-meta">
+                    <span class="preview-type">${type.toUpperCase()}</span>
+                    <span class="preview-length">${content.length} characters</span>
+                </div>
+                <div class="preview-text">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</div>
+            </div>
+        `;
+    } else {
+        preview.innerHTML = '<p class="preview-placeholder">Content preview will appear here...</p>';
+    }
+}
+
+function updateEditStatus(status) {
+    const statusBadge = document.getElementById('edit-status-badge');
+    const statusClasses = {
+        'ready': 'status-ready',
+        'saving': 'status-saving',
+        'saved': 'status-saved',
+        'error': 'status-error'
+    };
+    
+    const statusTexts = {
+        'ready': 'Ready',
+        'saving': 'Saving...',
+        'saved': 'Saved',
+        'error': 'Error'
+    };
+    
+    statusBadge.className = `status-badge ${statusClasses[status] || 'status-ready'}`;
+    statusBadge.textContent = statusTexts[status] || 'Ready';
+}
+
+function formatText(type) {
+    const textarea = document.getElementById('edit-material-content');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    
+    let formattedText = '';
+    switch(type) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+    }
+    
+    if (formattedText) {
+        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+        updateCharCounters();
+        updatePreview();
+    }
+}
+
+function insertLineBreak() {
+    const textarea = document.getElementById('edit-material-content');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    textarea.value = textarea.value.substring(0, start) + '\n\n' + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + 2, start + 2);
+    updateCharCounters();
+    updatePreview();
+}
+
+function previewMaterial() {
+    updatePreview();
+    document.getElementById('content-preview').scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetForm() {
+    if (confirm('Are you sure you want to reset all changes? This cannot be undone.')) {
+        editMaterial(currentMaterialId);
+    }
+}
+
+// Add event listeners for real-time updates
+document.addEventListener('DOMContentLoaded', function() {
+    const titleInput = document.getElementById('edit-material-title');
+    const contentTextarea = document.getElementById('edit-material-content');
+    const typeSelect = document.getElementById('edit-material-type');
+    
+    if (titleInput) {
+        titleInput.addEventListener('input', function() {
+            updateCharCounters();
+            updatePreview();
+        });
+    }
+    
+    if (contentTextarea) {
+        contentTextarea.addEventListener('input', function() {
+            updateCharCounters();
+            updatePreview();
+        });
+    }
+    
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function() {
+            updatePreview();
+        });
+    }
+});
+
+// User Management Functions
+let currentUserId = null;
+
+function exportUsers() {
+    fetch('/admin/export-users')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Create CSV content
+                const csvContent = createUserCSV(data.data);
+                downloadCSV(csvContent, 'users_export.csv');
+                alert('Users exported successfully!');
+            } else {
+                alert('Error exporting users: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting users.');
+        });
+}
+
+function viewUserStats() {
+    fetch('/admin/user-statistics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayUserStats(data.stats);
+                document.getElementById('user-stats-modal').style.display = 'block';
+            } else {
+                alert('Error loading user statistics: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading user statistics.');
+        });
+}
+
+function viewUser(userId) {
+    currentUserId = userId;
+    fetch(`/admin/user-details/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayUserDetails(data.user);
+                document.getElementById('user-view-modal').style.display = 'block';
+            } else {
+                alert('Error loading user: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading the user.');
+        });
+}
+
+function editUser(userId) {
+    currentUserId = userId;
+    fetch(`/admin/user-details/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateUserEditForm(data.user);
+                loadUserStats(userId);
+                document.getElementById('user-edit-modal').style.display = 'block';
+            } else {
+                alert('Error loading user: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while loading the user.');
+        });
+}
+
+// User Modal Management Functions
+function closeUserModal() {
+    document.getElementById('user-view-modal').style.display = 'none';
+    currentUserId = null;
+}
+
+function closeUserEditModal() {
+    document.getElementById('user-edit-modal').style.display = 'none';
+    currentUserId = null;
+}
+
+function closeUserStatsModal() {
+    document.getElementById('user-stats-modal').style.display = 'none';
+}
+
+function displayUserDetails(user) {
+    const content = document.getElementById('user-view-content');
+    content.innerHTML = `
+        <div class="user-details-card" style="display:flex;flex-direction:column;gap:14px;">
+            <div class="user-header" style="display:flex;align-items:center;gap:14px;">
+                <div class="user-avatar" style="width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#eef2ff;border:1px solid #dbe4ff;font-size:26px;">👤</div>
+                <div class="user-info">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <h3 style="margin:0;font-size:20px;">${user.username}</h3>
+                        <span class="user-badge" style="padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid ${user.is_admin ? '#fde68a' : '#e5e7eb'};background:${user.is_admin ? '#fffbeb' : '#f8fafc'};">${user.is_admin ? '👑 Administrator' : '👤 Regular User'}</span>
+                    </div>
+                    <div class="user-email" style="color:#6b7280;font-size:13px;">${user.email}</div>
+                </div>
+            </div>
+            <div class="user-meta" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                <div class="meta-item" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                    <div class="meta-label" style="font-size:12px;color:#6b7280;">🆔 User ID</div>
+                    <div class="meta-value" style="font-weight:600;">${user.id}</div>
+                </div>
+                <div class="meta-item" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                    <div class="meta-label" style="font-size:12px;color:#6b7280;">📅 Joined</div>
+                    <div class="meta-value" style="font-weight:600;">${user.created_at}</div>
+                </div>
+                <div class="meta-item" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;">
+                    <div class="meta-label" style="font-size:12px;color:#6b7280;">📧 Email</div>
+                    <div class="meta-value" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${user.email}</div>
+                </div>
+            </div>
+            <div class="user-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+                <div class="stat-card" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#ecfeff;border:1px solid #bae6fd;display:flex;align-items:center;justify-content:center;">📝</div>
+                    <div>
+                        <div style="font-size:12px;color:#64748b;">Total Quizzes</div>
+                        <div style="font-weight:700;">${user.total_quizzes || 0}</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;">⭐</div>
+                    <div>
+                        <div style="font-size:12px;color:#64748b;">Average Score</div>
+                        <div style="font-weight:700;">${user.avg_score || 0}%</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;display:flex;align-items:center;justify-content:center;">📚</div>
+                    <div>
+                        <div style="font-size:12px;color:#64748b;">Materials</div>
+                        <div style="font-weight:700;">${user.total_materials || 0}</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#fff1f2;border:1px solid #fecdd3;display:flex;align-items:center;justify-content:center;">💬</div>
+                    <div>
+                        <div style="font-size:12px;color:#64748b;">Feedback</div>
+                        <div style="font-weight:700;">${user.total_feedback || 0}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function populateUserEditForm(user) {
+    document.getElementById('edit-user-username').value = user.username;
+    document.getElementById('edit-user-email').value = user.email;
+    document.getElementById('edit-user-admin').value = user.is_admin.toString();
+    document.getElementById('edit-user-password').value = '';
+    
+    updateUserCharCounters();
+}
+
+function loadUserStats(userId) {
+    fetch(`/admin/user-statistics/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayUserStatsPreview(data.stats);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading user stats:', error);
+        });
+}
+
+function displayUserStatsPreview(stats) {
+    const preview = document.getElementById('user-stats-preview');
+    preview.innerHTML = `
+        <div class="stats-preview-grid">
+            <div class="preview-stat">
+                <span class="preview-label">📝 Quizzes:</span>
+                <span class="preview-value">${stats.total_quizzes || 0}</span>
+            </div>
+            <div class="preview-stat">
+                <span class="preview-label">⭐ Avg Score:</span>
+                <span class="preview-value">${stats.avg_score || 0}%</span>
+            </div>
+            <div class="preview-stat">
+                <span class="preview-label">📚 Materials:</span>
+                <span class="preview-value">${stats.total_materials || 0}</span>
+            </div>
+            <div class="preview-stat">
+                <span class="preview-label">💬 Feedback:</span>
+                <span class="preview-value">${stats.total_feedback || 0}</span>
+            </div>
+        </div>
+    `;
+}
+
+function displayUserStats(stats) {
+    const content = document.getElementById('user-stats-content');
+    content.innerHTML = `
+        <div class="user-stats-overview">
+            <div class="stats-summary">
+                <h4>📊 Overall Statistics</h4>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="summary-label">👥 Total Users:</span>
+                        <span class="summary-value">${stats.total_users}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">👑 Admin Users:</span>
+                        <span class="summary-value">${stats.admin_users}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">📝 Total Quizzes:</span>
+                        <span class="summary-value">${stats.total_quizzes}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">⭐ Average Score:</span>
+                        <span class="summary-value">${stats.avg_score}%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="recent-activity">
+                <h4>🕒 Recent Activity</h4>
+                <div class="activity-list">
+                    ${stats.recent_users.map(user => `
+                        <div class="activity-item">
+                            <span class="activity-user">${user.username}</span>
+                            <span class="activity-action">joined</span>
+                            <span class="activity-date">${user.created_at}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function saveUserEdit() {
+    if (!currentUserId) {
+        alert('No user selected for editing.');
+        return;
+    }
+
+    const formData = {
+        username: document.getElementById('edit-user-username').value,
+        email: document.getElementById('edit-user-email').value,
+        is_admin: document.getElementById('edit-user-admin').value === 'true',
+        password: document.getElementById('edit-user-password').value
+    };
+
+    if (!formData.username.trim() || !formData.email.trim()) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Update status to saving
+    updateUserEditStatus('saving');
+    const saveBtn = document.getElementById('save-user-btn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '💾 Saving...';
+
+    fetch(`/admin/update-user/${currentUserId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateUserEditStatus('saved');
+            setTimeout(() => {
+                alert('User updated successfully!');
+                closeUserEditModal();
+                location.reload();
+            }, 1000);
+        } else {
+            updateUserEditStatus('error');
+            alert('Error updating user: ' + data.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '💾 Save Changes';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        updateUserEditStatus('error');
+        alert('An error occurred while updating the user.');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '💾 Save Changes';
+    });
+}
+
+function updateUserEditStatus(status) {
+    const statusBadge = document.getElementById('user-edit-status-badge');
+    const statusClasses = {
+        'ready': 'status-ready',
+        'saving': 'status-saving',
+        'saved': 'status-saved',
+        'error': 'status-error'
+    };
+    
+    const statusTexts = {
+        'ready': 'Ready',
+        'saving': 'Saving...',
+        'saved': 'Saved',
+        'error': 'Error'
+    };
+    
+    statusBadge.className = `status-badge ${statusClasses[status] || 'status-ready'}`;
+    statusBadge.textContent = statusTexts[status] || 'Ready';
+}
+
+function updateUserCharCounters() {
+    const usernameInput = document.getElementById('edit-user-username');
+    const emailInput = document.getElementById('edit-user-email');
+    const usernameCount = document.getElementById('username-char-count');
+    const emailCount = document.getElementById('email-char-count');
+    
+    if (usernameInput && usernameCount) {
+        const usernameLength = usernameInput.value.length;
+        usernameCount.textContent = `${usernameLength}/80`;
+        usernameCount.className = usernameLength > 70 ? 'char-count warning' : 'char-count';
+    }
+    
+    if (emailInput && emailCount) {
+        const emailLength = emailInput.value.length;
+        emailCount.textContent = `${emailLength}/120`;
+        emailCount.className = emailLength > 100 ? 'char-count warning' : 'char-count';
+    }
+}
+
+function refreshUserStats() {
+    if (currentUserId) {
+        loadUserStats(currentUserId);
+    }
+}
+
+function exportUserStats() {
+    fetch('/admin/export-user-statistics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const csvContent = createStatsCSV(data.stats);
+                downloadCSV(csvContent, 'user_statistics.csv');
+                alert('User statistics exported successfully!');
+            } else {
+                alert('Error exporting statistics: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting statistics.');
+        });
+}
+
+// Utility Functions
+function createUserCSV(users) {
+    const headers = ['ID', 'Username', 'Email', 'Admin', 'Created At'];
+    const rows = users.map(user => [
+        user.id,
+        user.username,
+        user.email,
+        user.is_admin ? 'Yes' : 'No',
+        user.created_at
+    ]);
+    
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+}
+
+function createStatsCSV(stats) {
+    const headers = ['Metric', 'Value'];
+    const rows = [
+        ['Total Users', stats.total_users],
+        ['Admin Users', stats.admin_users],
+        ['Total Quizzes', stats.total_quizzes],
+        ['Average Score', stats.avg_score + '%']
+    ];
+    
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+}
+
+function downloadCSV(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Add event listeners for user edit form
+document.addEventListener('DOMContentLoaded', function() {
+    const usernameInput = document.getElementById('edit-user-username');
+    const emailInput = document.getElementById('edit-user-email');
+    
+    if (usernameInput) {
+        usernameInput.addEventListener('input', updateUserCharCounters);
+    }
+    
+    if (emailInput) {
+        emailInput.addEventListener('input', updateUserCharCounters);
+    }
+});
+
+// Analytics Functions
+let quizPerformanceChart = null;
+let userGrowthChart = null;
+
+function exportAnalytics() {
+    fetch('/admin/export-analytics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const csvContent = createAnalyticsCSV(data.data);
+                downloadCSV(csvContent, 'analytics_export.csv');
+                alert('Analytics data exported successfully!');
+            } else {
+                alert('Error exporting analytics: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while exporting analytics.');
+        });
+}
+
+function refreshAnalytics() {
+    // Show loading state
+    const refreshBtn = event.target;
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '🔄 Loading...';
+    refreshBtn.disabled = true;
+    
+    // Load analytics data
+    loadAnalyticsData()
+        .then(() => {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+            alert('Analytics refreshed successfully!');
+        })
+        .catch(error => {
+            console.error('Error refreshing analytics:', error);
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+            alert('Error refreshing analytics: ' + error.message);
+        });
+}
+
+function loadAnalyticsData() {
+    return Promise.all([
+        loadQuizPerformanceData(),
+        loadUserGrowthData(),
+        loadQuickStats()
+    ]);
+}
+
+function loadQuizPerformanceData() {
+    return fetch('/admin/analytics/quiz-performance')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                createQuizPerformanceChart(data.data);
+            } else {
+                console.error('Error loading quiz performance data:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading quiz performance data:', error);
+        });
+}
+
+function loadUserGrowthData() {
+    return fetch('/admin/analytics/user-growth')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                createUserGrowthChart(data.data);
+            } else {
+                console.error('Error loading user growth data:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading user growth data:', error);
+        });
+}
+
+function loadQuickStats() {
+    return fetch('/admin/analytics/quick-stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateQuickStats(data.stats);
+            } else {
+                console.error('Error loading quick stats:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading quick stats:', error);
+        });
+}
+
+function createQuizPerformanceChart(data) {
+    const ctx = document.getElementById('quiz-performance-chart');
+    if (!ctx) return;
+    
+    // Destroy existing chart if it exists
+    if (quizPerformanceChart) {
+        quizPerformanceChart.destroy();
+    }
+    
+    quizPerformanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Average Score (%)',
+                data: data.scores,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Quiz Performance Over Time',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+}
+
+function createUserGrowthChart(data) {
+    const ctx = document.getElementById('user-growth-chart');
+    if (!ctx) return;
+    
+    // Destroy existing chart if it exists
+    if (userGrowthChart) {
+        userGrowthChart.destroy();
+    }
+    
+    userGrowthChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'New Users',
+                data: data.users,
+                backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                borderColor: '#667eea',
+                borderWidth: 2,
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'User Growth Over Time',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+}
+
+function updateQuickStats(stats) {
+    const statsContainer = document.querySelector('.analytics-summary .stats-grid');
+    if (!statsContainer) return;
+    
+    statsContainer.innerHTML = `
+        <div class="stat-item">
+            <span class="stat-label">Most Popular Subject:</span>
+            <span class="stat-value">${stats.popular_subject}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Average Quiz Duration:</span>
+            <span class="stat-value">${stats.avg_duration} min</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">System Uptime:</span>
+            <span class="stat-value">${stats.uptime}%</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Quizzes:</span>
+            <span class="stat-value">${stats.total_quizzes}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Average Score:</span>
+            <span class="stat-value">${stats.avg_score}%</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Active Users (30d):</span>
+            <span class="stat-value">${stats.active_users}</span>
+        </div>
+    `;
+}
+
+function createAnalyticsCSV(data) {
+    const headers = ['Metric', 'Value'];
+    const rows = [
+        ['Total Users', data.total_users],
+        ['Total Quizzes', data.total_quizzes],
+        ['Total Materials', data.total_materials],
+        ['Total Feedback', data.total_feedback],
+        ['Flagged Feedback', data.flagged_feedback],
+        ['Resolved Feedback', data.resolved_feedback],
+        ['Average Score', data.avg_score + '%']
+    ];
+    
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+}
+
+// Initialize analytics when tab is shown
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.classList.add('active');
+    
+    // Load analytics data when analytics tab is shown
+    if (tabName === 'analytics') {
+        loadAnalyticsData();
+    }
+}
+
+// Initialize charts when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Admin dashboard loaded');
+    
+    // Load analytics data if analytics tab is active
+    const analyticsTab = document.getElementById('analytics-tab');
+    if (analyticsTab && analyticsTab.classList.contains('active')) {
+        loadAnalyticsData();
+    }
+});
+</script>
+{% endblock %}

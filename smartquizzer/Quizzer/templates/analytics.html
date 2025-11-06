@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}My Analytics{% endblock %}
+
+{% block content %}
+<h1>My Analytics</h1>
+
+<div class="analytics-grid" id="summary-stats">
+    <div class="stat-card">
+        <h3>Total Quizzes</h3>
+        <div class="stat-value" id="stat-total-quizzes">...</div>
+    </div>
+    <div class="stat-card">
+        <h3>Total Questions</h3>
+        <div class="stat-value" id="stat-total-questions">...</div>
+    </div>
+    <div class="stat-card">
+        <h3>Overall Accuracy</h3>
+        <div class="stat-value" id="stat-accuracy">...%</div>
+    </div>
+    <div class="stat-card">
+        <h3>Avg. Time / Q</h3>
+        <div class="stat-value" id="stat-avg-time">...s</div>
+    </div>
+</div>
+
+<div class="analytics-grid" style="grid-template-columns: 2fr 1fr;">
+    <div class="chart-container">
+        <h3>Performance Over Time</h3>
+        <canvas id="progress-chart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h3>Score Distribution</h3>
+        <canvas id="distribution-chart"></canvas>
+    </div>
+</div>
+
+<div class="chart-container">
+    <h3>Performance by Subject</h3>
+    <canvas id="subject-chart"></canvas>
+</div>
+
+
+<div class="analytics-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+        <h3>Personal Best Scores</h3>
+        <div class="analytics-table-container">
+            <table class="analytics-table" id="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <h3>Recent Attempts</h3>
+        <div class="analytics-table-container">
+            <table class="analytics-table" id="recent-attempts-table">
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Helper function to get grade class
+function getGradeClass(grade) {
+    if (grade.startsWith('A')) return 'grade-A';
+    if (grade === 'B') return 'grade-B';
+    if (grade === 'C') return 'grade-C';
+    if (grade === 'D') return 'grade-D';
+    return 'grade-F';
+}
+
+// 1. Load Summary Stats
+async function loadSummary() {
+    try {
+        const response = await fetch("{{ url_for('analytics_summary') }}");
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('stat-total-quizzes').textContent = data.data.total_quizzes;
+            document.getElementById('stat-total-questions').textContent = data.data.total_questions;
+            document.getElementById('stat-accuracy').textContent = `${data.data.accuracy}%`;
+            document.getElementById('stat-avg-time').textContent = `${data.data.avg_time}s`;
+        }
+    } catch (e) { console.error("Error loading summary", e); }
+}
+
+// 2. Load Table Data
+async function loadTables() {
+    // Leaderboard
+    try {
+        const resLeaderboard = await fetch("{{ url_for('analytics_leaderboard') }}");
+        const dataLeaderboard = await resLeaderboard.json();
+        const lbBody = document.querySelector('#leaderboard-table tbody');
+        lbBody.innerHTML = '';
+        if (dataLeaderboard.success && dataLeaderboard.leaderboard.length > 0) {
+            dataLeaderboard.leaderboard.forEach(item => {
+                const gradeClass = getGradeClass(item.grade);
+                lbBody.innerHTML += `
+                    <tr>
+                        <td>${item.topic}</td>
+                        <td>${item.score_percentage}% (${item.score}/${item.total_questions})</td>
+                        <td class="grade ${gradeClass}">${item.grade}</td>
+                        <td>${item.completed_at}</td>
+                    </tr>`;
+            });
+        } else {
+             lbBody.innerHTML = '<tr><td colspan="4" class="text-center">No data yet.</td></tr>';
+        }
+    } catch (e) { console.error("Error loading leaderboard", e); }
+
+    // Recent Attempts
+    try {
+        const resAttempts = await fetch("{{ url_for('analytics_attempts') }}");
+        const dataAttempts = await resAttempts.json();
+        const attBody = document.querySelector('#recent-attempts-table tbody');
+        attBody.innerHTML = '';
+        if (dataAttempts.success && dataAttempts.attempts.length > 0) {
+            dataAttempts.attempts.forEach(item => {
+                const gradeClass = getGradeClass(item.grade);
+                attBody.innerHTML += `
+                    <tr>
+                        <td>${item.topic}</td>
+                        <td>${item.percentage}% (${item.score}/${item.total_questions})</td>
+                        <td class="grade ${gradeClass}">${item.grade}</td>
+                        <td>${item.completed_at}</td>
+                    </tr>`;
+            });
+        } else {
+             attBody.innerHTML = '<tr><td colspan="4" class="text-center">No quizzes taken yet.</td></tr>';
+        }
+    } catch (e) { console.error("Error loading attempts", e); }
+}
+
+// 3. Load Chart Data
+async function loadCharts() {
+    try {
+        const response = await fetch("{{ url_for('analytics_charts') }}");
+        const data = await response.json();
+        if (!data.success) return;
+
+        const charts = data.charts;
+
+        // Progress Chart (Line)
+        const ctxProgress = document.getElementById('progress-chart').getContext('2d');
+        new Chart(ctxProgress, {
+            type: 'line',
+            data: {
+                labels: charts.progress_over_time.map(d => d.date),
+                datasets: [{
+                    label: 'Score %',
+                    data: charts.progress_over_time.map(d => d.score),
+                    borderColor: '#5b86e5',
+                    backgroundColor: 'rgba(91, 134, 229, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // Distribution Chart (Doughnut)
+        const ctxDist = document.getElementById('distribution-chart').getContext('2d');
+        new Chart(ctxDist, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(charts.score_distribution),
+                datasets: [{
+                    label: 'Score Distribution',
+                    data: Object.values(charts.score_distribution),
+                    backgroundColor: [
+                        '#e74c3c', '#e67e22', '#f39c12', '#2ecc71', '#27ae60'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Subject Chart (Bar)
+        const ctxSubject = document.getElementById('subject-chart').getContext('2d');
+        new Chart(ctxSubject, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(charts.subject_performance),
+                datasets: [{
+                    label: 'Average Score % by Subject',
+                    data: Object.values(charts.subject_performance),
+                    backgroundColor: '#6a89cc',
+                    borderColor: '#5b86e5',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                indexAxis: 'y'
+            }
+        });
+
+    } catch (e) { console.error("Error loading charts", e); }
+}
+
+
+// Load all data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadTables();
+    loadCharts();
+});
+</script>
+{% endblock %}

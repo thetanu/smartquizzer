@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Material{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 700px; margin: 2rem auto;">
+    <h2>Upload Learning Material</h2>
+    <p class="mb-2">Upload content to generate quizzes from your own material.</p>
+
+    <form action="{{ url_for('upload_material') }}" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Material Title</label>
+            <input type="text" id="title" name="title" class="form-control" placeholder="e.g., Python Basics Chapter 1" required>
+        </div>
+
+        <div class="upload-tabs">
+            <div class="upload-tab active" data-tab="text">Paste Text</div>
+            <div class="upload-tab" data-tab="file">Upload File</div>
+            <div class="upload-tab" data-tab="url">From URL</div>
+        </div>
+
+        <input type="hidden" name="upload_type" id="upload_type" value="text">
+
+        <div id="tab-text" class="upload-tab-content active">
+            <div class="form-group">
+                <label for="pasted_text">Paste your text content here:</label>
+                <textarea name="pasted_text" id="pasted_text" class="form-control" rows="10"></textarea>
+            </div>
+        </div>
+
+        <div id="tab-file" class="upload-tab-content">
+            <div class="form-group">
+                <label for="material_file">Upload a PDF or TXT file:</label>
+                <input type="file" name="material_file" id="material_file" class="form-control" accept=".pdf,.txt">
+            </div>
+        </div>
+
+        <div id="tab-url" class="upload-tab-content">
+            <div class="form-group">
+                <label for="material_url">Enter a URL (e.g., Wikipedia):</label>
+                <input type="url" name="material_url" id="material_url" class="form-control" placeholder="https://en.wikipedia.org/wiki/Python_(programming_language)">
+                <small>(URL processing is a demo and may not work for all sites)</small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block mt-2">Upload and Process</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelectorAll('.upload-tab');
+    const tabContents = document.querySelectorAll('.upload-tab-content');
+    const uploadTypeInput = document.getElementById('upload_type');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Add active class to clicked
+            tab.classList.add('active');
+            const tabName = tab.getAttribute('data-tab');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // Update hidden input
+            uploadTypeInput.value = tabName;
+        });
+    });
+});
+</script>
+{% endblock %}

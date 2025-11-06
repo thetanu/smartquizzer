@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Home - AI SmartQuizzer{% endblock %}
+
+{% block content %}
+<div class="card text-center" style="padding: 3rem;">
+    <h1>Welcome, {{ username }}!</h1>
+    <p class="mb-3" style="font-size: 1.2rem;">Ready to test your knowledge?</p>
+    
+    <div style="display: flex; justify-content: center; gap: 1rem;">
+        <a href="{{ url_for('quiz') }}" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.8rem 1.8rem;">
+            Start a General Quiz
+        </a>
+        <a href="{{ url_for('list_materials') }}" class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.8rem 1.8rem;">
+            Quiz from My Materials
+        </a>
+    </div>
+</div>
+{% endblock %}

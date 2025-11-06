@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ material.title }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1>{{ material.title }}</h1>
+    <a href="{{ url_for('quiz', material_id=material.id) }}" class="btn btn-primary" style="font-size: 1.1rem;">
+        🚀 Generate Quiz from this Material
+    </a>
+</div>
+
+<div class="card">
+    <h3>Processed Content Preview:</h3>
+    <div class="material-content-box">
+        {{ material.content }}
+    </div>
+</div>
+
+<a href="{{ url_for('list_materials') }}" class="mt-2">&larr; Back to all materials</a>
+{% endblock %}

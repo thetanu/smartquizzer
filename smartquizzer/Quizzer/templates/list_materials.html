@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}My Materials{% endblock %}
+
+{% block content %}
+<div class="materials-header">
+    <h1>My Learning Materials</h1>
+    <a href="{{ url_for('upload_material') }}" class="btn btn-primary">Upload New Material</a>
+</div>
+
+<div class="card">
+    {% if materials %}
+        <ul class="material-list">
+            {% for material in materials %}
+            <li class="material-item">
+                <div class="material-info">
+                    <h3>{{ material.title }}</h3>
+                    <span>Type: {{ material.material_type.upper() }} | Uploaded: {{ material.created_at.strftime('%Y-%m-%d') }}</span>
+                </div>
+                <div class="material-actions">
+                    <a href="{{ url_for('view_material', material_id=material.id) }}" class="btn btn-secondary">
+                        View & Quiz
+                    </a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-center">You have not uploaded any learning materials yet.</p>
+        <p class="text-center mt-1">
+            <a href="{{ url_for('upload_material') }}">Upload your first document</a> to get started!
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

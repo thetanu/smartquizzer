@@ -1,0 +1,8 @@
+Flask
+flask_sqlalchemy
+python-dotenv
+groq
+werkzeug
+PyMuPDF
+requests
+beautifulsoup4

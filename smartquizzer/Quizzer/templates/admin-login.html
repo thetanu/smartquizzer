@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login - AI SmartQuizzer{% endblock %}
+
+{% block content %}
+<div class="card card-auth">
+    <h1>Admin Sign In</h1>
+    <div id="alert-box"></div>
+    <form id="admin-login-form" class="mt-2">
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Admin Sign In</button>
+    </form>
+    <div class="auth-links">
+        <a href="{{ url_for('admin_register') }}">Don't have admin access? Register</a>
+        <a href="{{ url_for('login') }}">Back to Regular Login</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('admin-login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const alertBox = document.getElementById('alert-box');
+    
+    try {
+        const response = await fetch("{{ url_for('admin_login') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            alertBox.textContent = 'Admin login successful! Redirecting...';
+            alertBox.className = 'alert-success';
+            alertBox.style.display = 'block';
+            window.location.href = "{{ url_for('admin_dashboard') }}";
+        } else {
+            alertBox.textContent = data.message || 'Invalid admin credentials';
+            alertBox.className = 'alert-danger';
+            alertBox.style.display = 'block';
+        }
+    } catch (error) {
+        alertBox.textContent = 'An error occurred. Please try again.';
+        alertBox.className = 'alert-danger';
+        alertBox.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

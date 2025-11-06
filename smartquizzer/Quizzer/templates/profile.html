@@ -1,0 +1,817 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<h1>{{ username }}'s Profile</h1>
+
+<div class="profile-grid">
+    <div class="card">
+        <h2>My Preferences</h2>
+        <form action="{{ url_for('profile') }}" method="POST">
+            <div class="form-group">
+                <label for="subjects_of_interest">Subjects of Interest</label>
+                <textarea id="subjects_of_interest" name="subjects_of_interest" class="form-control" placeholder="e.g., Python, History, Space">{{ profile.subjects_of_interest|default('', true) }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="preferred_difficulty">Preferred Difficulty</label>
+                <select id="preferred_difficulty" name="preferred_difficulty" class="form-control">
+                    <option value="easy" {% if profile.preferred_difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                    <option value="medium" {% if profile.preferred_difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="hard" {% if profile.preferred_difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Save Preferences</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Recent Performance History</h2>
+        <div id="history-list">
+            {% if history %}
+                {% for a in history %}
+                    <div class="history-item clickable" onclick="showQuizDetails({{ a.id }})" data-attempt-id="{{ a.id }}">
+                        <div class="history-item-info">
+                            {{ a.topic }}
+                            <span>{{ a.date }}</span>
+                        </div>
+                        <div class="history-item-score 
+                            {% if a.percentage < 50 %}low{% elif a.percentage < 75 %}mid{% endif %}">
+                            {{ a.percentage }}%
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>You have not completed any quizzes yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Analytics Section -->
+<div class="analytics-section" style="margin-top: 2rem;">
+    <h2>My Analytics</h2>
+    
+    <div class="analytics-grid" id="summary-stats">
+        <div class="stat-card">
+            <h3>Total Quizzes</h3>
+            <div class="stat-value" id="stat-total-quizzes">...</div>
+        </div>
+        <div class="stat-card">
+            <h3>Total Questions</h3>
+            <div class="stat-value" id="stat-total-questions">...</div>
+        </div>
+        <div class="stat-card">
+            <h3>Overall Accuracy</h3>
+            <div class="stat-value" id="stat-accuracy">...%</div>
+        </div>
+        <div class="stat-card">
+            <h3>Avg. Time / Q</h3>
+            <div class="stat-value" id="stat-avg-time">...s</div>
+        </div>
+    </div>
+
+    <div class="analytics-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="chart-container">
+            <h3>Performance Over Time</h3>
+            <canvas id="progress-chart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Score Distribution</h3>
+            <canvas id="distribution-chart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3>Performance by Subject</h3>
+        <canvas id="subject-chart"></canvas>
+    </div>
+
+    <div class="analytics-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="card">
+            <h3 class="section-title">Personal Best Scores</h3>
+            <div class="analytics-table-container">
+                <table class="analytics-table" id="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Topic</th>
+                            <th>Score</th>
+                            <th>Grade</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h3 class="section-title">Recent Attempts</h3>
+            <div class="analytics-table-container">
+                <table class="analytics-table" id="recent-attempts-table">
+                    <thead>
+                        <tr>
+                            <th>Topic</th>
+                            <th>Score</th>
+                            <th>Grade</th>
+                            <th>Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+                <div id="recent-pagination" style="display:flex; gap:.25rem; flex-wrap:wrap; justify-content:flex-end; margin-top:.5rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+        <h3 class="section-title">All Quiz Attempts</h3>
+        <div class="filters-row" style="display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; align-items:center;">
+            <div class="form-group" style="margin:0;">
+                <label for="filter-topic">Topic</label>
+                <input id="filter-topic" type="text" class="form-control" placeholder="Filter by topic" style="min-width:200px;">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="sort-by">Sort by</label>
+                <select id="sort-by" class="form-control">
+                    <option value="date">Date</option>
+                    <option value="topic">Topic</option>
+                    <option value="grade">Grade</option>
+                    <option value="score">Score</option>
+                    <option value="percentage">Percentage</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label for="sort-order">Order</label>
+                <select id="sort-order" class="form-control">
+                    <option value="desc">Desc</option>
+                    <option value="asc">Asc</option>
+                </select>
+            </div>
+            <button id="apply-filters" class="btn btn-secondary" style="align-self:flex-end;">Apply</button>
+        </div>
+        <div class="analytics-table-container">
+            <table class="analytics-table" id="all-attempts-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Topic</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                </tbody>
+            </table>
+            <div id="attempts-pagination" style="display:flex; gap:.25rem; flex-wrap:wrap; justify-content:flex-end; margin-top:.5rem;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Quiz Details Modal -->
+<div id="quiz-details-modal" class="modal">
+    <div class="modal-content quiz-modal-content">
+        <div class="modal-header">
+            <h3 id="modal-quiz-title">Quiz Details</h3>
+            <span class="close" onclick="closeQuizModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="quiz-summary" id="quiz-summary">
+                <!-- Quiz summary will be loaded here -->
+            </div>
+            <div class="questions-container" id="questions-container">
+                <!-- Questions will be loaded here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeQuizModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Add profile-page class to body for full-width styling
+document.body.classList.add('profile-page');
+// Helper function to get grade class
+function getGradeClass(grade) {
+    if (grade.startsWith('A')) return 'grade-A';
+    if (grade === 'B') return 'grade-B';
+    if (grade === 'C') return 'grade-C';
+    if (grade === 'D') return 'grade-D';
+    return 'grade-F';
+}
+
+// 1. Load Summary Stats
+async function loadSummary() {
+    try {
+        const response = await fetch("{{ url_for('analytics_summary') }}");
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('stat-total-quizzes').textContent = data.data.total_quizzes;
+            document.getElementById('stat-total-questions').textContent = data.data.total_questions;
+            document.getElementById('stat-accuracy').textContent = `${data.data.accuracy}%`;
+            document.getElementById('stat-avg-time').textContent = `${data.data.avg_time}s`;
+        }
+    } catch (e) { console.error("Error loading summary", e); }
+}
+
+// 2. Load Table Data
+async function loadTables() {
+    // Leaderboard
+    try {
+        const resLeaderboard = await fetch("{{ url_for('analytics_leaderboard') }}");
+        const dataLeaderboard = await resLeaderboard.json();
+        const lbBody = document.querySelector('#leaderboard-table tbody');
+        lbBody.innerHTML = '';
+        if (dataLeaderboard.success && dataLeaderboard.leaderboard.length > 0) {
+            dataLeaderboard.leaderboard.forEach(item => {
+                const gradeClass = getGradeClass(item.grade);
+                lbBody.innerHTML += `
+                    <tr>
+                        <td>${item.topic}</td>
+                        <td>${item.score_percentage}% (${item.score}/${item.total_questions})</td>
+                        <td class="grade ${gradeClass}">${item.grade}</td>
+                        <td>${item.completed_at}</td>
+                    </tr>`;
+            });
+        } else {
+             lbBody.innerHTML = '<tr><td colspan="4" class="text-center">No data yet.</td></tr>';
+        }
+    } catch (e) { console.error("Error loading leaderboard", e); }
+
+    // Defer Recent Attempts to dedicated loader with pagination
+    loadRecentAttempts();
+}
+
+// Pagination + filters for All Attempts
+let attemptsPage = 1;
+const attemptsPerPage = 10;
+let attemptsSortBy = 'date';
+let attemptsOrder = 'desc';
+let attemptsTopic = '';
+
+async function loadAllAttempts() {
+    const tbody = document.querySelector('#all-attempts-table tbody');
+    const pager = document.getElementById('attempts-pagination');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+    try {
+        const params = new URLSearchParams({
+            page: String(attemptsPage), per_page: String(attemptsPerPage), sort_by: attemptsSortBy, order: attemptsOrder
+        });
+        if (attemptsTopic && attemptsTopic.trim() !== '') params.set('topic', attemptsTopic.trim());
+        const res = await fetch(`{{ url_for('analytics_attempts') }}?${params.toString()}`);
+        const data = await res.json();
+        tbody.innerHTML = '';
+        if (data.success && data.attempts.length > 0) {
+            data.attempts.forEach((item, idx) => {
+                const gradeClass = getGradeClass(item.grade);
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${(attemptsPage - 1) * attemptsPerPage + idx + 1}</td>
+                        <td>${item.topic}</td>
+                        <td>${item.percentage}% (${item.score}/${item.total_questions})</td>
+                        <td class="grade ${gradeClass}">${item.grade}</td>
+                        <td>${item.completed_at}</td>
+                        <td><button class="btn btn-secondary btn-sm" onclick="showQuizDetails(${item.id})">View</button></td>
+                    </tr>`;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No attempts yet.</td></tr>';
+        }
+        // Build pagination
+        if (pager) {
+            pager.innerHTML = '';
+            const total = data.total || 0;
+            const totalPages = Math.max(1, Math.ceil(total / attemptsPerPage));
+            const makeBtn = (p) => `<button class="btn btn-secondary btn-sm" ${p===attemptsPage?'disabled':''} data-page="${p}">${p}</button>`;
+            const maxToShow = 7;
+            if (totalPages <= maxToShow) {
+                for (let p=1;p<=totalPages;p++) pager.innerHTML += makeBtn(p);
+            } else {
+                // 1 ... current-1 current current+1 ... last
+                pager.innerHTML += makeBtn(1);
+                if (attemptsPage > 3) pager.innerHTML += '<span class="muted" style="padding:.35rem .5rem;">…</span>';
+                const start = Math.max(2, attemptsPage - 1);
+                const end = Math.min(totalPages - 1, attemptsPage + 1);
+                for (let p=start;p<=end;p++) pager.innerHTML += makeBtn(p);
+                if (attemptsPage < totalPages - 2) pager.innerHTML += '<span class="muted" style="padding:.35rem .5rem;">…</span>';
+                pager.innerHTML += makeBtn(totalPages);
+            }
+            pager.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => { attemptsPage = parseInt(btn.getAttribute('data-page')); loadAllAttempts(); });
+            });
+        }
+    } catch (e) { console.error('Error loading all attempts', e); tbody.innerHTML = '<tr><td colspan="6" class="text-center">Error loading data.</td></tr>'; }
+}
+
+// Recent attempts pagination (10 per page)
+let recentPage = 1;
+const recentPerPage = 10;
+async function loadRecentAttempts() {
+    const tbody = document.querySelector('#recent-attempts-table tbody');
+    const pager = document.getElementById('recent-pagination');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+    try {
+        const params = new URLSearchParams({ page: String(recentPage), per_page: String(recentPerPage), sort_by: 'date', order: 'desc' });
+        const res = await fetch(`{{ url_for('analytics_attempts') }}?${params.toString()}`);
+        const data = await res.json();
+        tbody.innerHTML = '';
+        if (data.success && data.attempts.length > 0) {
+            data.attempts.forEach(item => {
+                const gradeClass = getGradeClass(item.grade);
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.topic}</td>
+                        <td>${item.percentage}% (${item.score}/${item.total_questions})</td>
+                        <td class="grade ${gradeClass}">${item.grade}</td>
+                        <td>${item.completed_at}</td>
+                        <td><button class="btn btn-secondary btn-sm" onclick="showQuizDetails(${item.id})">View</button></td>
+                    </tr>`;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No quizzes taken yet.</td></tr>';
+        }
+        if (pager) {
+            pager.innerHTML = '';
+            const total = data.total || 0;
+            const totalPages = Math.max(1, Math.ceil(total / recentPerPage));
+            const makeBtn = (p) => `<button class=\"btn btn-secondary btn-sm\" ${p===recentPage?'disabled':''} data-page=\"${p}\">${p}</button>`;
+            const maxToShow = 7;
+            if (totalPages <= maxToShow) {
+                for (let p=1;p<=totalPages;p++) pager.innerHTML += makeBtn(p);
+            } else {
+                pager.innerHTML += makeBtn(1);
+                if (recentPage > 3) pager.innerHTML += '<span class=\"muted\" style=\"padding:.35rem .5rem;\">…</span>';
+                const start = Math.max(2, recentPage - 1);
+                const end = Math.min(totalPages - 1, recentPage + 1);
+                for (let p=start;p<=end;p++) pager.innerHTML += makeBtn(p);
+                if (recentPage < totalPages - 2) pager.innerHTML += '<span class=\"muted\" style=\"padding:.35rem .5rem;\">…</span>';
+                pager.innerHTML += makeBtn(totalPages);
+            }
+            pager.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => { recentPage = parseInt(btn.getAttribute('data-page')); loadRecentAttempts(); });
+            });
+        }
+    } catch (e) { console.error('Error loading recent attempts', e); tbody.innerHTML = '<tr><td colspan="5" class="text-center">Error loading data.</td></tr>'; }
+}
+
+// 3. Load Chart Data
+async function loadCharts() {
+    try {
+        const response = await fetch("{{ url_for('analytics_charts') }}");
+        const data = await response.json();
+        if (!data.success) return;
+
+        const charts = data.charts;
+
+        // Progress Chart (Line)
+        const ctxProgress = document.getElementById('progress-chart').getContext('2d');
+        new Chart(ctxProgress, {
+            type: 'line',
+            data: {
+                labels: charts.progress_over_time.map(d => d.date),
+                datasets: [{
+                    label: 'Score %',
+                    data: charts.progress_over_time.map(d => d.score),
+                    borderColor: '#5b86e5',
+                    backgroundColor: 'rgba(91, 134, 229, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // Distribution Chart (Doughnut)
+        const ctxDist = document.getElementById('distribution-chart').getContext('2d');
+        const distributionLabels = Object.keys(charts.score_distribution);
+        const distributionData = Object.values(charts.score_distribution);
+        
+        // Create more descriptive labels
+        const descriptiveLabels = distributionLabels.map(label => {
+            switch(label) {
+                case '0-20': return 'Needs Improvement (0-20%)';
+                case '21-40': return 'Below Average (21-40%)';
+                case '41-60': return 'Average (41-60%)';
+                case '61-80': return 'Good (61-80%)';
+                case '81-100': return 'Excellent (81-100%)';
+                default: return label;
+            }
+        });
+        
+        // Enhanced color scheme with better contrast
+        const distributionColors = [
+            '#dc3545', // Red for needs improvement
+            '#fd7e14', // Orange for below average
+            '#ffc107', // Yellow for average
+            '#20c997', // Teal for good
+            '#28a745'  // Green for excellent
+        ];
+        
+        new Chart(ctxDist, {
+            type: 'doughnut',
+            data: {
+                labels: descriptiveLabels,
+                datasets: [{
+                    label: 'Number of Quizzes',
+                    data: distributionData,
+                    backgroundColor: distributionColors,
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    hoverBorderWidth: 4,
+                    hoverBorderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        align: 'center',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 8,
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            },
+                            color: '#333',
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    const dataset = data.datasets[0];
+                                    return data.labels.map((label, i) => {
+                                        const value = dataset.data[i];
+                                        const total = dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                        return {
+                                            text: `${label}: ${value} quizzes (${percentage}%)`,
+                                            fillStyle: dataset.backgroundColor[i],
+                                            strokeStyle: dataset.borderColor,
+                                            lineWidth: dataset.borderWidth,
+                                            pointStyle: 'circle',
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        callbacks: {
+                            title: function(context) {
+                                return 'Score Range Distribution';
+                            },
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return `${label}: ${value} quizzes (${percentage}% of total)`;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 1000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+
+        // Subject Chart (Bar)
+        const ctxSubject = document.getElementById('subject-chart').getContext('2d');
+        const subjectLabels = Object.keys(charts.subject_performance);
+        const subjectScores = Object.values(charts.subject_performance);
+        
+        // Generate dynamic colors based on performance
+        const backgroundColors = subjectScores.map(score => {
+            if (score >= 80) return 'rgba(40, 167, 69, 0.8)'; // Green for excellent
+            if (score >= 60) return 'rgba(255, 193, 7, 0.8)'; // Yellow for good
+            if (score >= 40) return 'rgba(255, 152, 0, 0.8)'; // Orange for fair
+            return 'rgba(220, 53, 69, 0.8)'; // Red for needs improvement
+        });
+        
+        const borderColors = subjectScores.map(score => {
+            if (score >= 80) return 'rgba(40, 167, 69, 1)';
+            if (score >= 60) return 'rgba(255, 193, 7, 1)';
+            if (score >= 40) return 'rgba(255, 152, 0, 1)';
+            return 'rgba(220, 53, 69, 1)';
+        });
+        
+        new Chart(ctxSubject, {
+            type: 'bar',
+            data: {
+                labels: subjectLabels,
+                datasets: [{
+                    label: 'Average Score % by Subject',
+                    data: subjectScores,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 2,
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Subject',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Average Score (%)',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            },
+                            font: {
+                                size: 12
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Average Score: ${context.parsed.y}%`;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+
+    } catch (e) { console.error("Error loading charts", e); }
+}
+
+// Quiz Details Modal Functions
+function showQuizDetails(attemptId) {
+    const modal = document.getElementById('quiz-details-modal');
+    const quizSummary = document.getElementById('quiz-summary');
+    const questionsContainer = document.getElementById('questions-container');
+    const modalTitle = document.getElementById('modal-quiz-title');
+    
+    // Show loading state
+    modal.style.display = 'block';
+    quizSummary.innerHTML = '<div class="loading">Loading quiz details...</div>';
+    questionsContainer.innerHTML = '';
+    
+    // Fetch quiz details
+    fetch(`/api/quiz-attempt/${attemptId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const attempt = data.attempt;
+                
+                // Update modal title
+                modalTitle.textContent = `${attempt.topic} - Quiz Details`;
+                
+                // Create quiz summary
+                quizSummary.innerHTML = `
+                    <div class="quiz-info">
+                        <h4>Quiz Summary</h4>
+                        <div class="quiz-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Topic:</span>
+                                <span class="stat-value">${attempt.topic}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Score:</span>
+                                <span class="stat-value">${attempt.score}/${attempt.total_questions} (${attempt.percentage}%)</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Completed:</span>
+                                <span class="stat-value">${attempt.completed_at}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+        // Helpers to normalize answers/options
+        const normalize = (val) => {
+            if (val === null || val === undefined) return '';
+            if (Array.isArray(val)) return val.join(', ');
+            if (typeof val === 'object') {
+                // common shapes {value: 'A'} or {'text': '...'}
+                if ('value' in val) return String(val.value);
+                if ('text' in val) return String(val.text);
+                try { return JSON.stringify(val); } catch { return String(val); }
+            }
+            return String(val);
+        };
+
+        // Create questions
+        questionsContainer.innerHTML = attempt.questions.map((rawQuestion, index) => {
+                const question = {
+                    question_text: normalize(rawQuestion.question_text),
+                    question_type: rawQuestion.question_type || '',
+                    options: Array.isArray(rawQuestion.options) ? rawQuestion.options.map(normalize) : null,
+                    correct_answer: normalize(rawQuestion.correct_answer),
+                    user_answer: normalize(rawQuestion.user_answer),
+                    is_correct: !!rawQuestion.is_correct,
+                    explanation: normalize(rawQuestion.explanation),
+                    time_spent: rawQuestion.time_spent
+                };
+                
+                const labels = ['A','B','C','D','E','F','G','H'];
+                const optionItems = question.options ? question.options.map((opt, i) => {
+                    const labeled = `${labels[i] || ''}. ${opt}`;
+                    const isCorrect = question.correct_answer && normalize(opt) === question.correct_answer;
+                    const isUser = question.user_answer && normalize(opt) === question.user_answer;
+                    const classes = [
+                        isCorrect ? 'correct-option' : '',
+                        isUser && !isCorrect ? 'user-option' : ''
+                    ].join(' ').trim();
+                    return `<li class="${classes}">${labeled}${isCorrect ? ' (Correct)' : ''}${isUser && !isCorrect ? ' (Your Answer)' : ''}</li>`;
+                }).join('') : '';
+
+                let correctDisplay = '—';
+                let userDisplay = '—';
+                if (question.options && question.options.length > 0) {
+                    const correctIdx = question.correct_answer ? question.options.findIndex(o => normalize(o) === question.correct_answer) : -1;
+                    const userIdx = question.user_answer ? question.options.findIndex(o => normalize(o) === question.user_answer) : -1;
+                    correctDisplay = correctIdx >= 0 ? `${labels[correctIdx] || ''}) ${question.options[correctIdx]}` : (question.correct_answer || '—');
+                    userDisplay = userIdx >= 0 ? `${labels[userIdx] || ''}) ${question.options[userIdx]}` : (question.user_answer || '—');
+                } else if ((question.question_type || '').toLowerCase().includes('true') || (question.question_type || '').toLowerCase().includes('boolean')) {
+                    correctDisplay = question.correct_answer ? String(question.correct_answer) : '—';
+                    userDisplay = question.user_answer ? String(question.user_answer) : '—';
+                } else {
+                    correctDisplay = question.correct_answer && question.correct_answer.trim() !== '' ? question.correct_answer : '—';
+                    userDisplay = question.user_answer && question.user_answer.trim() !== '' ? question.user_answer : '—';
+                }
+
+                return `
+                    <div class="question-item ${question.is_correct ? 'correct' : 'incorrect'}">
+                        <div class="question-header">
+                            <h5>Question ${index + 1}</h5>
+                            <span class="question-status ${question.is_correct ? 'correct' : 'incorrect'}">
+                                ${question.is_correct ? '✓ Correct' : '✗ Incorrect'}
+                            </span>
+                        </div>
+                        <div class="question-content">
+                            <p class="question-text">${question.question_text}</p>
+                            
+                            ${question.options ? `
+                                <div class="options">
+                                    <h6>Options:</h6>
+                                    <ul>
+                                        ${optionItems}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="answer-info">
+                                <div class="correct-answer">
+                                    <strong>Correct Answer:</strong> ${correctDisplay}
+                                </div>
+                                <div class="user-answer">
+                                    <strong>Your Answer:</strong> ${userDisplay}
+                                </div>
+                            </div>
+                            
+                            ${question.explanation && question.explanation.trim() !== '' ? `
+                                <div class="explanation">
+                                    <strong>Explanation:</strong>
+                                    <p>${question.explanation}</p>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="question-meta">
+                                <small>Time spent: ${question.time_spent || 0} seconds</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+                
+            } else {
+                quizSummary.innerHTML = '<div class="error">Error loading quiz details: ' + data.message + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            quizSummary.innerHTML = '<div class="error">Error loading quiz details. Please try again.</div>';
+        });
+}
+
+function closeQuizModal() {
+    document.getElementById('quiz-details-modal').style.display = 'none';
+}
+
+// Close modal when clicking outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('quiz-details-modal');
+    if (event.target === modal) {
+        closeQuizModal();
+    }
+}
+
+// Load all data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadTables();
+    loadCharts();
+    // All attempts filters
+    const topicEl = document.getElementById('filter-topic');
+    const sortByEl = document.getElementById('sort-by');
+    const sortOrderEl = document.getElementById('sort-order');
+    const applyBtn = document.getElementById('apply-filters');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            attemptsTopic = topicEl ? topicEl.value : '';
+            attemptsSortBy = sortByEl ? sortByEl.value : 'date';
+            attemptsOrder = sortOrderEl ? sortOrderEl.value : 'desc';
+            attemptsPage = 1;
+            loadAllAttempts();
+        });
+    }
+    // initial load
+    loadAllAttempts();
+});
+</script>
+{% endblock %}
